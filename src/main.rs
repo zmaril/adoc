@@ -1,97 +1,134 @@
 use std::fs;
+use core::cmp::max;
 
-fn day_one_input() -> Vec<i32> {
-    let contents = fs::read_to_string("inputs/day1puzzle1.txt")
+static reading_len: usize = 5; 
+
+fn day_three_input() -> Vec<Vec<u32>> {
+    //let contents = fs::read_to_string("inputs/day3puzzle1.txt")
+    let contents = fs::read_to_string("inputs/day3sample.txt")
     .expect("Something went wrong reading the file");
     let lines = contents.lines();
-    let numbers : Vec<i32>= lines.map(|x| {x.parse::<i32>().unwrap()}).collect();
-    return numbers;
-}
-
-fn d1p1() {
-    let numbers = day_one_input();
-    let mut increases = 0;
-    for i in 0..(numbers.len()-1){
-        println!("{} {}", numbers[i], numbers[i+1]);
-        if numbers[i+1] > numbers[i] {
-            increases += 1;
-        }
-    }
-    println!("{:#?}", increases);
-}
-
-fn d1p2() {
-    let numbers = day_one_input();
-    let mut increases = 0;
-    for i in 0..(numbers.len()-3){
-        println!("{} {} {}", i, numbers[i], numbers[i+3]);
-        if numbers[i+3] > numbers[i] {
-            increases += 1;
-        }
-    }
-    println!("{:#?}", increases);
-}
-
-
-fn day_two_input() -> Vec<(String, i32)> {
-    let contents = fs::read_to_string("inputs/day2puzzle1.txt")
-    .expect("Something went wrong reading the file");
-    let lines = contents.lines();
-    let directions = lines.map(|x| {
-        let mut split = x.split(" ");
-        let direction = split.next().unwrap().to_string();
-        let distance = split.next().unwrap().parse::<i32>().unwrap();
-        return (direction, distance)
+    let ints = lines.map(|line| {
+        return line.chars().map(|v| {
+            if v == '1' {
+                return 1;
+            }
+            else {
+                return 0;
+            }
+        }).collect();
     }).collect();
-    return directions;
+    return ints;
 }
 
-fn d2p1 () {
-    let directions = day_two_input();
-    println!("{:?}",directions);
-
-    let mut x = 0;
-    let mut y = 0; 
-    for (direction, distance) in directions {
-        println!("{} {}", direction, distance);
-        match direction.as_str() {
-            "forward" => x+= distance, 
-            "down" => y+= distance, 
-            "up" => y-= distance, 
-            _ => unreachable!()
-        };
-        println!("{} {}\n", x, y);
+fn get_greeks(ints: Vec<Vec<u32>>) -> (Vec<u32>, Vec<u32>) {
+    let mut sums : Vec<u32> = vec![];
+    for i in 0..reading_len {
+        let mut index_sum = 0;
+        for b in ints.clone() {
+            index_sum += b[i]
+        }
+        sums.push(index_sum)
     }
-    println!("{}",x*y);
-}
+    println!("Sums: {:?}",sums);
+    println!("Len: {}", ints.len());
+    let halfway = ints.len()/2;
 
-
-fn d2p2 () {
-    let directions = day_two_input();
-    println!("{:?}",directions);
-
-    let mut x = 0;
-    let mut y = 0; 
-    let mut aim = 0;
-    for (direction, distance) in directions {
-        println!("{} {}", direction, distance);
-        match direction.as_str() {
-            "forward" => {
-                x += distance;
-                y += aim*distance;
-            }, 
-            "down" => {
-                aim += distance
-            }, 
-            "up" => {
-                aim -= distance
-            }, 
-            _ => unreachable!()
-        };
-        println!("{} {} {}\n", x, y, aim);
+    let mut gamma: Vec<u32> = vec![];
+    let mut epsilon: Vec<u32> = vec![];
+    for s in sums {
+        if s > halfway.try_into().unwrap()  {
+            gamma.push(1);
+            epsilon.push(0);
+        }
+        else  {
+            gamma.push(0);
+            epsilon.push(1);
+        }
     }
-    println!("{}",x*y);
+    return (gamma, epsilon);
 }
+
+fn binarray_to_int(arr: Vec<u32>) -> isize {
+    let mut s = "".to_owned(); 
+    for a in arr {
+        s.push_str(&a.to_string());
+    }
+    let i = isize::from_str_radix(&s,2).unwrap();
+    return i;
+}
+
+fn d3p1() {
+    let ints = day_three_input().clone();
+    let (gamma, epsilon) = get_greeks(ints);
+    //println!("{:?}", ints.clone());
+    println!("Gamma: {:?}", gamma.clone());
+    println!("Epsilon: {:?}", epsilon.clone());
+    let gi = binarray_to_int(gamma);
+    let ei = binarray_to_int(epsilon);
+    println!("Gamma: {}", gi);
+    println!("Epsilon: {}", ei);
+    println!("Together: {}", ei*gi);
+}
+
+fn count_left_overlap(left: Vec<u32>, right: Vec<u32>) -> u32 {
+    let mut count = 0; 
+    for i in 0..reading_len {
+        if left[i] == right[i] {
+            count += 1;
+        }
+        else {
+            break;
+        }
+    }
+    return count; 
+}
+
+fn d3p2() {
+    let ints = day_three_input().clone();
+    let (gamma, epsilon) = get_greeks(ints.clone());
+    println!("{:?}", ints.clone());
+    println!("Gamma: {:?}", gamma.clone());
+    println!("Epsilon: {:?}", epsilon.clone());
+
+    //  
+    let mut oxy_count = 0; 
+    for arr in ints.clone() {
+        oxy_count = max(oxy_count, count_left_overlap(gamma.clone(), arr))
+    }
+    println!("oxy: {:?}", oxy_count);
+    let mut oxys: Vec<Vec<u32>> = vec![];
+    for arr in ints.clone() {
+        if count_left_overlap(gamma.clone(), arr.clone()) == oxy_count {
+            oxys.push(arr.clone())
+        }
+    }
+    println!("{:?}", oxys);
+    let first_oxys = &oxys[0];
+    println!("First oxys: {:?}\n", first_oxys);
+    //  
+    let mut scrubber_count = 0; 
+    for arr in ints.clone() {
+        scrubber_count = max(scrubber_count, count_left_overlap(epsilon.clone(), arr))
+    }
+    println!("scrubber: {:?}", scrubber_count);
+    let mut scrubbers: Vec<Vec<u32>> = vec![];
+    for arr in ints.clone() {
+        if count_left_overlap(epsilon.clone(), arr.clone()) == scrubber_count {
+            scrubbers.push(arr.clone())
+        }
+    }
+    println!("{:?}", scrubbers);
+    let first_scrubber = &scrubbers[0];
+    println!("First scrubber: {:?}\n", first_scrubber);
+
+    let oi = binarray_to_int(first_oxys.to_vec());
+    let si = binarray_to_int(first_scrubber.to_vec());
+    println!("Oxy: {}", oi);
+    println!("Scrubber: {}", si);
+    println!("Together: {}", oi*si);
+}
+
 fn main() {
-    d2p2();
+    d3p2();
 }
