@@ -97,8 +97,8 @@ impl Tree {
 pub fn radix() {
     let mut tree = Tree::new();
     let readings = get_data();
-    for reading in readings {
-        tree.insert(reading)
+    for reading in &readings {
+        tree.insert(*reading)
     }
     println!("{:?}", tree);
     dbg!(tree);
