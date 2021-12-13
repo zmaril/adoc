@@ -3,9 +3,8 @@
 extern crate colored; // not needed in Rust 2018
 
 //pub mod p3radix;
-pub mod p9;
+pub mod p13;
 
 fn main() {
-    //p3radix::radix();
-    p9::main();
+    p13::main();
 }
