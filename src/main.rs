@@ -1,10 +1,9 @@
 #![feature(box_patterns)]
-#![feature(str_split_once)]
 extern crate colored; // not needed in Rust 2018
 
 //pub mod p3radix;
-pub mod p17;
+pub mod p19;
 
 fn main() {
-    p17::main();
+    p19::main();
 }
