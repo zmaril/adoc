@@ -1,13 +1,15 @@
 use std::collections::HashSet;
-use std::ops::{Mul, Add, Sub};
 use std::fmt;
+use std::ops::{Add, Mul, Sub};
 
-#[derive(Clone, PartialEq, Hash, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Hash, Eq, PartialOrd, Ord)]
 pub struct Coord {
     x: i32,
     y: i32,
     z: i32,
 }
+
+const ZERO: Coord = Coord { x: 0, y: 0, z: 0 };
 
 impl fmt::Debug for Coord {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -61,10 +63,9 @@ pub struct Scanner {
 }
 
 pub fn distance_between(a: Coord, b: Coord) -> i32 {
-    let x = a.x - b.x;
-    let y = a.y - b.y;
-    let z = a.z - b.z;
-    return x.pow(2) + y.pow(2) + z.pow(2);
+    let d = &a - &b;
+    let dd = &d * &d;
+    return dd.x + dd.y + dd.z;
 }
 
 pub fn distance_map(signals: Vec<Coord>) -> DistanceMap {
@@ -158,7 +159,6 @@ pub fn rotate_coord(mut c: Coord, rotations: i32) -> Coord {
             c.z = c.y;
             c.y = tmp;
         }
-
         _ => unreachable!(),
     }
     return c;
@@ -167,75 +167,59 @@ pub fn rotate_coord(mut c: Coord, rotations: i32) -> Coord {
 pub fn find_orientation(matched: Vec<(Coord, Coord)>) -> Option<(Coord, Coord, i32)> {
     let f = matched[0].clone();
     let a = f.0;
-    dbg!(&a);
+
     for sx in vec![-1, 1] {
-        for sy in vec![-1, 1] {
+        for sy in vec![1, -1] {
             for sz in vec![-1, 1] {
-                //TODO: maybe there are more rotations idk
+                let s = Coord {
+                    x: sx,
+                    y: sy,
+                    z: sz,
+                };
+
+                // I have a
+                // I have b
+                // Both are in different coord systems.
+                // I rotate b into the right one.
+                // Then I found the distance between first two matches.
+                // a = d + r(s(b));
                 for rotations in vec![0, 1, 2, 3, 4, 5] {
-                    let mut new_b = Coord {
-                        x: sx * f.1.x,
-                        y: sy * f.1.y,
-                        z: sz * f.1.z,
-                    };
+                    let mut new_b = f.1;
+                    new_b = &s * &new_b;
+                    new_b = rotate_coord(new_b, rotations); //these should be communitative,
 
-                    new_b = rotate_coord(new_b, rotations);
-                    dbg!(&new_b);
+                    let d = &a - &new_b;
 
-                    let mut d = Coord {
-                        x: a.x - new_b.x,
-                        y: a.y - new_b.y,
-                        z: a.z - new_b.z,
-                    };
-
-                    let s = Coord {
-                        x: sx,
-                        y: sy,
-                        z: sz,
-                    };
-
-                    let shifted = matched
+                    let flipped = matched
                         .iter()
-                        .map(|(ia, ib)| {
-                            (
-                                ia.clone(),
-                                Coord {
-                                    x: d.x + sx * ib.x,
-                                    y: d.y + sy * ib.y,
-                                    z: d.z + sz * ib.z,
-                                },
-                            )
-                        })
+                        .map(|(ia, ib)| (ia.clone(), &s * &ib))
                         .collect::<Vec<(Coord, Coord)>>();
 
-                    let rotated = shifted
+                    let rotated = flipped
                         .iter()
                         .map(|(ia, ib)| (ia.clone(), rotate_coord(ib.clone(), rotations)))
                         .collect::<Vec<(Coord, Coord)>>();
 
-                    let distances = rotated
+                    let shifted = rotated
                         .iter()
-                        .map(|(ia, ib)| Coord {
-                            x: ia.x - ib.x,
-                            y: ia.y - ib.y,
-                            z: ia.z - ib.z,
-                        })
+                        .map(|(ia, ib)| (ia.clone(), &d + &ib))
+                        .collect::<Vec<(Coord, Coord)>>();
+
+                    let distances = shifted
+                        .iter()
+                        .map(|(ia, ib)| ia - ib)
                         .collect::<Vec<Coord>>();
 
-                    dbg!(&d, &s, rotations);
-                    for (i, distance) in distances.iter().enumerate() {
-                        println!("A: {:?}", matched[i].0);
-                        println!("B: {:?}", matched[i].1);
-                        println!("B: {:?} shifted", shifted[i].1);
-                        println!("B: {:?} rotated", rotated[i].1);
-                        println!("Distance: {:?}\n", distance);
-                    }
-                    if distances.iter().all(|c| c.x == 0 && c.y == 0 && c.z == 0) {
-                        println!("Found orientation!");
-                        dbg!(&d, &s, rotations);
+                    // dbg!(&d, &s, rotations);
+                    // for (i, distance) in distances.iter().enumerate() {
+                    //     println!("A: {:?}, B': {:?}, Distance: {:?}", matched[i].0, rotated[i].1, distance);
+                    // }
+
+                    if distances.iter().all(|c| c == &ZERO) {
+                        //    println!("Found orientation!\n");
                         return Some((d, s, rotations));
                     }
-                    println!("\n")
+                    //println!("\n")
                 }
             }
         }
@@ -248,17 +232,9 @@ pub fn reorient(mut sc: Scanner, d: Coord, s: Coord, rotations: i32) -> Scanner 
         .signals
         .iter()
         .map(|c| {
-            let mut new_c = Coord {
-                x: s.x * c.x,
-                y: s.y * c.y,
-                z: s.z * c.z,
-            };
+            let mut new_c = &s * &c;
             new_c = rotate_coord(new_c, rotations);
-            return Coord {
-                x: d.x + new_c.x,
-                y: d.y + new_c.y,
-                z: d.z + new_c.z,
-            };
+            return &d + &new_c;
         })
         .collect();
     return sc;
@@ -268,7 +244,9 @@ pub fn test0() {
     let repeated = parse_data(include_str!(
         "../inputs/day19shouldhaveusedtheseearlier.txt"
     ));
-    //dbg!(&repeated);
+
+    //orient yourself with rotations and s
+    //then swim
     let first = repeated[0].clone();
     for sc in &repeated[1..] {
         let matched = get_matching_overlap(first.clone(), sc.clone());
@@ -276,6 +254,32 @@ pub fn test0() {
         let reoriented = reorient(sc.clone(), d, s, rotations);
         assert_eq!(reoriented.signals, first.signals);
     }
+}
+
+pub fn testa() {
+    let repeated = parse_data(include_str!("../inputs/day19syn.txt"));
+    let first = repeated[0].clone();
+    // first step is 1,1,-1 switched
+    // next step is rotation 2, xz switched
+    // step after that is shift down -1, -1, -1
+
+    let matched = get_matching_overlap(first.clone(), repeated[1].clone());
+    let (d, s, rotations) = find_orientation(matched).unwrap();
+    assert_eq!(rotations, 0);
+    assert_eq!(s, Coord { x: 1, y: 1, z: -1 });
+    assert_eq!(d, Coord { x: 0, y: 0, z: 0 });
+
+    let matched = get_matching_overlap(first.clone(), repeated[2].clone());
+    let (d, s, rotations) = find_orientation(matched).unwrap();
+    assert_eq!(rotations, 2);
+    assert_eq!(s, Coord { x: -1, y: 1, z: 1 });
+    assert_eq!(d, Coord { x: 0, y: 0, z: 0 });
+
+    let matched = get_matching_overlap(first.clone(), repeated[3].clone());
+    let (d, s, rotations) = find_orientation(matched).unwrap();
+    assert_eq!(rotations, 2);
+    assert_eq!(s, Coord { x: -1, y: 1, z: 1 });
+    assert_eq!(d, Coord { x: 1, y: 1, z: -1 });
 }
 
 pub fn test1() {
@@ -303,41 +307,105 @@ pub fn test1() {
     assert_eq!(rs, Coord { x: 1, y: 1, z: 1 });
 }
 
-pub fn test2() {
-    let sample2_scanners = parse_data(include_str!("../inputs/day19sample2.txt"));
-    let s0 = sample2_scanners[0].clone();
-    let s1 = sample2_scanners[1].clone();
-    let s4 = sample2_scanners[4].clone();
-
-    println!("Doing s0 and s1");
-    let matched = get_matching_overlap(s0.clone(), s1.clone());
-    let (d, s, r) = find_orientation(matched).unwrap();
-    let reoriented_s1 = reorient(s1.clone(), d, s, r);
-
-    println!("Doing rs1 and s4");
-    let mut matched = get_matching_overlap(s1.clone(), s4.clone());
-    let (d, s, r) = find_orientation(matched).unwrap();
-    let reoriented_s4 = reorient(s4, d, s, r);
+// make sure that they are oriented together or else it will braek
+pub fn combine_scanner(mut l: Scanner, r: Scanner, d: Coord, s: Coord, rotations: i32) -> Scanner {
+    let mut reoriented = reorient(r.clone(), d, s, rotations);
+    l.signals.append(&mut reoriented.signals);
+    l.signals.sort();
+    l.signals.dedup();
+    l.distances = distance_map(l.clone().signals);
+    return l;
 }
 
-pub fn find_num_beacons(scanners: Vec<Scanner>) -> usize {
-    let mut oriented: Vec<Scanner> = vec![];
-    let mut newly_oriented: Vec<Scanner> = vec![];
-    newly_oriented.push(scanners[0].clone());
-    let mut unoriented: Vec<Scanner> = vec![];
-    unoriented.append(&mut scanners[1..].to_vec());
+pub fn test2() {
+    let sample2_scanners = parse_data(include_str!("../inputs/day19sample2.txt"));
+    let mut s0 = sample2_scanners[0].clone();
+    let s1 = sample2_scanners[1].clone();
+    let s2 = sample2_scanners[2].clone();
+    let s3 = sample2_scanners[3].clone();
+    let s4 = sample2_scanners[4].clone();
 
-    while let Some(next) = newly_oriented.pop() {
-        println!("Orienting off of scanner {}", next.id);
+    //s1
+    let matched = get_matching_overlap(s0.clone(), s1.clone());
+    let (d, s, r) = find_orientation(matched).unwrap();
+
+    assert_eq!(r, 0);
+    assert_eq!(s, Coord { x: -1, y: 1, z: -1 });
+    assert_eq!(
+        d,
+        Coord {
+            x: 68,
+            y: -1246,
+            z: -43
+        }
+    );
+    s0 = combine_scanner(s0, s1, d, s, r);
+
+    //s4
+    let matched = get_matching_overlap(s0.clone(), s4.clone());
+    let (d, s, r) = find_orientation(matched).unwrap();
+
+    assert_eq!(r, 4);
+    assert_eq!(s, Coord { x: 1, y: -1, z: -1 });
+    assert_eq!(
+        d,
+        Coord {
+            x: -20,
+            y: -1133,
+            z: 1061
+        }
+    );
+    s0 = combine_scanner(s0, s4, d, s, r);
+
+    //s2
+    let matched = get_matching_overlap(s0.clone(), s2.clone());
+    let (d, s, r) = find_orientation(matched).unwrap();
+
+    assert_eq!(r, 1);
+    assert_eq!(s, Coord { x: -1, y: 1, z: 1 });
+    assert_eq!(
+        d,
+        Coord {
+            x: 1105,
+            y: -1205,
+            z: 1229
+        }
+    );
+    s0 = combine_scanner(s0, s2, d, s, r);
+
+    //s3
+    let matched = get_matching_overlap(s0.clone(), s3.clone());
+    let (d, s, r) = find_orientation(matched).unwrap();
+
+    assert_eq!(r, 0);
+    assert_eq!(s, Coord { x: -1, y: 1, z: -1 });
+    assert_eq!(
+        d,
+        Coord {
+            x: -92,
+            y: -2380,
+            z: -20
+        }
+    );
+    s0 = combine_scanner(s0, s3, d, s, r);
+    assert_eq!(s0.signals.len(), 79);
+}
+
+pub fn find_num_beacons(scanners: Vec<Scanner>) -> (usize, Vec<Coord>) {
+    let mut spots: Vec<Coord> = vec![];
+    let mut mega_scanner = scanners[0].clone();
+    let mut unoriented: Vec<Scanner> = scanners[1..].to_vec();
+
+    while unoriented.len() != 0 {
         let mut leftovers: Vec<Scanner> = vec![];
         for sc in unoriented.clone() {
-            let matched = get_matching_overlap(next.clone(), sc.clone());
+            let matched = get_matching_overlap(mega_scanner.clone(), sc.clone());
             if matched.len() >= 12 {
                 match find_orientation(matched) {
                     Some((d, s, r)) => {
                         println!("Found a good match {}", sc.id);
-                        let reoriented_sc = reorient(sc, d, s, r);
-                        newly_oriented.push(reoriented_sc);
+                        spots.push(d);
+                        mega_scanner = combine_scanner(mega_scanner, sc, d, s, r);
                     }
                     None => {
                         println!("Found a unorientable match {}", sc.id);
@@ -345,37 +413,43 @@ pub fn find_num_beacons(scanners: Vec<Scanner>) -> usize {
                     }
                 }
             } else {
-                println!("Pushing to leftovers {}", sc.id);
                 leftovers.push(sc);
             }
         }
         unoriented = leftovers;
-        oriented.push(next);
-        println!("");
     }
 
-    let mut beacons: HashSet<Coord> = HashSet::new();
-    for sc in oriented {
-        //println!("making beacon list: {}", sc.id);
-        for s in sc.signals {
-            //println!("orinted: {}, {}, {}", s.x, s.y, s.z);
-            beacons.insert(s.clone());
-        }
-    }
-    let mut r = beacons.into_iter().collect::<Vec<Coord>>();
-    r.sort();
-    for poop in r.clone() {
-        //println!("{}, {}, {}", poop.x, poop.y, poop.z);
-    }
-    dbg!(r.len())
+    return (mega_scanner.signals.len(), spots);
 }
+
 pub fn main() {
     let _sample1_scanners = parse_data(include_str!("../inputs/day19sample1.txt"));
     let sample2_scanners = parse_data(include_str!("../inputs/day19sample2.txt"));
-    let _puzzle_scanners = parse_data(include_str!("../inputs/day19puzzle.txt"));
+    let puzzle_scanners = parse_data(include_str!("../inputs/day19puzzle.txt"));
 
     test0();
     test1();
-    //test2();
-    //find_num_beacons(sample2_scanners);
+    testa();
+    test2();
+    let (num, spots) = find_num_beacons(sample2_scanners);
+    let mut max_distance = 0;
+    for s in &spots {
+        for t in &spots {
+            let d = (s.x - t.x).abs() + (s.y - t.y).abs() + (s.z - t.z).abs();
+            max_distance = std::cmp::max(d, max_distance);
+        }
+    }
+    assert_eq!(79, num);
+    assert_eq!(3621, max_distance);
+
+    let (num, spots) = find_num_beacons(puzzle_scanners);
+    let mut max_distance = 0;
+    for s in &spots {
+        for t in &spots {
+            let d = (s.x - t.x).abs() + (s.y - t.y).abs() + (s.z - t.z).abs();
+            max_distance = std::cmp::max(d, max_distance);
+        }
+    }
+    assert_eq!(451, num);
+    assert_eq!(13184, max_distance);
 }
