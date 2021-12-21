@@ -177,16 +177,10 @@ pub fn find_orientation(matched: Vec<(Coord, Coord)>) -> Option<(Coord, Coord, i
                     z: sz,
                 };
 
-                // I have a
-                // I have b
-                // Both are in different coord systems.
-                // I rotate b into the right one.
-                // Then I found the distance between first two matches.
-                // a = d + r(s(b));
                 for rotations in vec![0, 1, 2, 3, 4, 5] {
                     let mut new_b = f.1;
                     new_b = &s * &new_b;
-                    new_b = rotate_coord(new_b, rotations); //these should be communitative,
+                    new_b = rotate_coord(new_b, rotations); 
 
                     let d = &a - &new_b;
 
@@ -210,16 +204,9 @@ pub fn find_orientation(matched: Vec<(Coord, Coord)>) -> Option<(Coord, Coord, i
                         .map(|(ia, ib)| ia - ib)
                         .collect::<Vec<Coord>>();
 
-                    // dbg!(&d, &s, rotations);
-                    // for (i, distance) in distances.iter().enumerate() {
-                    //     println!("A: {:?}, B': {:?}, Distance: {:?}", matched[i].0, rotated[i].1, distance);
-                    // }
-
                     if distances.iter().all(|c| c == &ZERO) {
-                        //    println!("Found orientation!\n");
                         return Some((d, s, rotations));
                     }
-                    //println!("\n")
                 }
             }
         }
