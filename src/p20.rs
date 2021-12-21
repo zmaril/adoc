@@ -87,24 +87,28 @@ pub fn get_number(step: i32, (x, y): (i32, i32), g: &Grid) -> usize {
     }
     return n;
 }
-pub fn step(step: i32, grid: Grid, algo: &ImageEnhanceAlgo) -> Grid {
-    let mut to_examine:HashSet<(i32,i32)> = HashSet::with_capacity(0);
 
+pub fn step(step: i32, grid: &Grid, algo: &ImageEnhanceAlgo) -> Grid {
+    let mut min_x = 0;
+    let mut min_y = 0;
+    let mut max_x = 0;
+    let mut max_y = 0;
     for ((x, y), _) in &grid.values {
-        for dx in vec![-1, 0, 1] {
-            for dy in vec![-1, 0, 1] {
-                to_examine.insert((x + dx, y + dy));
-            }
-        }
+        min_x = std::cmp::min(min_x, *x-1);
+        min_y = std::cmp::min(min_y, *y-1);
+        max_x = std::cmp::max(max_x, *x+1);
+        max_y = std::cmp::max(max_y, *y+1);
     }
 
     let mut new_grid = Grid {
         values: HashMap::with_capacity(0),
     };
 
-    for xy in to_examine {
-        let number = get_number(step, xy, &grid);
-        new_grid.values.insert(xy, algo[number]);
+    for x in min_x..=max_x {
+        for y in min_y..=max_y {
+            let xy = (x,y);
+            new_grid.values.insert(xy, algo[get_number(step, xy, &grid)]);
+        }
     }
     return new_grid;
 }
@@ -122,7 +126,7 @@ pub fn main() {
 
     assert_eq!(147, get_number(1, (5, 6), &sample1.clone()));
 
-    let mut stepped1 = step(1, sample1.clone(), &sample_algo);
+    let mut stepped1 = step(1, &sample1, &sample_algo);
     stepped1.values = stepped1
         .values
         .iter()
@@ -132,7 +136,7 @@ pub fn main() {
 
     assert_eq!(stepped1, sample2);
 
-    let mut stepped2 = step(1, sample2.clone(), &sample_algo);
+    let mut stepped2 = step(1, &sample2, &sample_algo);
     stepped2.values = stepped2
         .values
         .iter()
@@ -163,7 +167,7 @@ pub fn main() {
                 .len()
         );
         //println!("{}\n", g);
-        g = step(1, g, &sample_algo);
+        g = step(1, &g, &sample_algo);
     }
 
     // let mut g = sample_grid.clone();
@@ -187,6 +191,6 @@ pub fn main() {
                 .len()
         );
         //println!("{}\n", g);
-        g = step(i, g, &puzzle_algo);
+        g = step(i, &g, &puzzle_algo);
     }
 }
