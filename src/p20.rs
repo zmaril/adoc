@@ -1,9 +1,12 @@
-use std::collections::{HashMap, HashSet};
+//use std::collections::{HashMap};
+use rayon::prelude::*;
+use rustc_hash::FxHashMap;
 use std::fmt;
+use std::sync::Mutex;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Grid {
-    values: HashMap<(i32, i32), bool>,
+    values: FxHashMap<(i32, i32), bool>,
 }
 
 pub type ImageEnhanceAlgo = Vec<bool>;
@@ -16,7 +19,7 @@ impl fmt::Display for Grid {
         let mut max_x = 1;
         let mut max_y = 1;
 
-        for ((x, y), b) in self.values.iter() {
+        for ((x, y), _b) in self.values.iter() {
             min_x = std::cmp::min(min_x, *x);
             min_y = std::cmp::min(min_y, *y);
             max_x = std::cmp::max(max_x, *x);
@@ -44,7 +47,7 @@ impl fmt::Display for Grid {
 }
 
 pub fn parse_grid(g: &str) -> Grid {
-    let values: HashMap<(i32, i32), bool> = g
+    let values: FxHashMap<(i32, i32), bool> = g
         .lines()
         .enumerate()
         .map(|(x, l)| {
@@ -56,36 +59,33 @@ pub fn parse_grid(g: &str) -> Grid {
         })
         .flatten()
         .map(|(x, y, b)| ((x as i32, y as i32), b))
-        .collect::<HashMap<(i32, i32), bool>>();
+        .collect::<FxHashMap<(i32, i32), bool>>();
     Grid { values }
 }
 pub fn parse_data(s: &str) -> (Grid, ImageEnhanceAlgo) {
     let (i, g) = s.split_once("\n\n").unwrap();
     let algo: ImageEnhanceAlgo = i.chars().map(|x| x == '#').collect::<ImageEnhanceAlgo>();
-    return (parse_grid(g), algo);
+    (parse_grid(g), algo)
 }
 
 pub fn get_number(step: i32, (x, y): (i32, i32), g: &Grid) -> usize {
     let mut n = 0;
     let mut t = 1;
-    for dy in vec![1, 0, -1] {
-        for dx in vec![1, 0, -1] {
+    for dy in &[1, 0, -1] {
+        for dx in &[1, 0, -1] {
             let contains = g.values.contains_key(&(x + dx, y + dy));
             if contains {
                 let b = g.values[&(x + dx, y + dy)];
                 if b {
                     n += t;
                 }
-
-            } else {
-                if step % 2 == 0 {
-                    n += t;
-                }
+            } else if step % 2 == 0 {
+                n += t;
             }
-            t = t *2;
+            t *= 2;
         }
     }
-    return n;
+    n
 }
 
 pub fn step(step: i32, grid: &Grid, algo: &ImageEnhanceAlgo) -> Grid {
@@ -93,24 +93,27 @@ pub fn step(step: i32, grid: &Grid, algo: &ImageEnhanceAlgo) -> Grid {
     let mut min_y = 0;
     let mut max_x = 0;
     let mut max_y = 0;
-    for ((x, y), _) in &grid.values {
-        min_x = std::cmp::min(min_x, *x-1);
-        min_y = std::cmp::min(min_y, *y-1);
-        max_x = std::cmp::max(max_x, *x+1);
-        max_y = std::cmp::max(max_y, *y+1);
+    for (x, y) in grid.values.keys() {
+        min_x = std::cmp::min(min_x, *x - 1);
+        min_y = std::cmp::min(min_y, *y - 1);
+        max_x = std::cmp::max(max_x, *x + 1);
+        max_y = std::cmp::max(max_y, *y + 1);
     }
 
     let mut new_grid = Grid {
-        values: HashMap::with_capacity(0),
+        values: FxHashMap::default(),
     };
 
-    for x in min_x..=max_x {
-        for y in min_y..=max_y {
-            let xy = (x,y);
-            new_grid.values.insert(xy, algo[get_number(step, xy, &grid)]);
+    let m = Mutex::new(new_grid);
+    (min_x..=max_x).into_par_iter().for_each(|x| {
+        let results = (min_y..=max_y).map(|y| ((x, y), algo[get_number(step, (x, y), grid)]));
+        let mut l = m.lock().unwrap();
+        for (xy, b) in results {
+            l.values.insert(xy, b);
         }
-    }
-    return new_grid;
+    });
+    let gg = m.lock().unwrap();
+    gg
 }
 
 pub fn main() {
@@ -124,7 +127,7 @@ pub fn main() {
     let sample2 = parse_grid(include_str!("../inputs/day20sample2.txt"));
     let sample3 = parse_grid(include_str!("../inputs/day20sample3.txt"));
 
-    assert_eq!(147, get_number(1, (5, 6), &sample1.clone()));
+    assert_eq!(147, get_number(1, (5, 6), &sample1));
 
     let mut stepped1 = step(1, &sample1, &sample_algo);
     stepped1.values = stepped1
@@ -132,7 +135,7 @@ pub fn main() {
         .iter()
         .filter(|((x, y), _)| *x >= 0 && *y >= 0 && *x <= 14 && *y <= 14)
         .map(|((x, y), b)| ((*x, *y), *b))
-        .collect::<HashMap<(i32, i32), bool>>();
+        .collect::<FxHashMap<(i32, i32), bool>>();
 
     assert_eq!(stepped1, sample2);
 
@@ -142,11 +145,11 @@ pub fn main() {
         .iter()
         .filter(|((x, y), _)| *x >= 0 && *y >= 0 && *x <= 14 && *y <= 14)
         .map(|((x, y), b)| ((*x, *y), *b))
-        .collect::<HashMap<(i32, i32), bool>>();
+        .collect::<FxHashMap<(i32, i32), bool>>();
 
     for (xy, b) in &stepped2.values {
-        if sample3.values.contains_key(&xy) {
-            if sample3.values[&xy] != *b {
+        if sample3.values.contains_key(xy) {
+            if sample3.values[xy] != *b {
                 println!("Different values: {:?} {}", xy, b);
             }
         } else {
@@ -155,16 +158,12 @@ pub fn main() {
     }
     assert_eq!(stepped2, sample3);
 
-    let mut g = sample_grid.clone();
+    let mut g = sample_grid;
     for i in 1..=51 {
         println!(
             "Step {} with {} lit",
             i,
-            g.values
-                .iter()
-                .filter(|(_, b)| { **b })
-                .collect::<Vec<_>>()
-                .len()
+            g.values.iter().filter(|(_, b)| { **b }).count()
         );
         //println!("{}\n", g);
         g = step(1, &g, &sample_algo);
@@ -184,11 +183,7 @@ pub fn main() {
         println!(
             "Step {} with {} lit",
             i,
-            g.values
-                .iter()
-                .filter(|(_, b)| { **b })
-                .collect::<Vec<_>>()
-                .len()
+            g.values.iter().filter(|(_, b)| { **b }).count()
         );
         //println!("{}\n", g);
         g = step(i, &g, &puzzle_algo);
