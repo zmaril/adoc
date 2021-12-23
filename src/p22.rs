@@ -170,27 +170,39 @@ pub struct RegionBall {
 //     return total;
 // }
 
-pub fn find_components(ints: Vec<Instruction>) -> Vec<Vec<usize>> {
-    let mut overlaps: Vec<(usize,usize)> = vec![];
-    for (i, iint) in ints.iter().enumerate() {
-         for (j, jint)  in ints.iter().enumerate() {
-            if let Some(_) = region_overlap(jint.region, iint.region) {
-                overlaps.push((i,j))
-            }
-        }
-    }
-    let components: Vec<Vec<usize>> = vec![];
-    for (i,j) in overlaps {
-        // can just sort these 
-        let existing: = components.iter().filter(|x| x.contains(&i) || x.contains(&j)).collect();
-    }
-    return components;
-}
+// pub fn find_components(ints: Vec<Instruction>) -> Vec<Vec<usize>> {
+//     let mut overlaps: Vec<(usize,usize)> = vec![];
+//     for (i, iint) in ints.iter().enumerate() {
+//          for (j, jint)  in ints.iter().enumerate() {
+//             if let Some(_) = region_overlap(jint.region, iint.region) {
+//                 overlaps.push((i,j))
+//             }
+//         }
+//     }
+//     let components: Vec<Vec<usize>> = vec![];
+//     for (i,j) in overlaps {
+//         // can just sort these 
+//         let existing: = components.iter().filter(|x| x.contains(&i) || x.contains(&j)).collect();
+//     }
+//     return components;
+// }
 
 pub fn main() {
     let instructions = parse_data(EXAMPLE);
-    assert_eq!(39, count_cubes2(instructions));
-    // let instructions = parse_data(include_str!("../inputs/day22sample.txt"));
+    //assert_eq!(39, count_cubes(instructions));
+    for i in 0..instructions.clone().len(){
+        println!("step {}, size {}", i, count_cubes(instructions[0..i+1].to_vec()));
+    }
+    let sizes = vec![27, 46, 38, 39];
+    for i in 0..sizes.len() {
+        assert_eq!(sizes[i], count_cubes(instructions[0..i+1].to_vec()));
+    }
+
+    let instructions = parse_data(include_str!("../inputs/day22sample.txt"));
+    for i in 0..instructions.clone().len(){
+        println!("step {}, size {}", i, count_cubes(instructions[0..i].to_vec()));
+    }
+
     // assert_eq!(590784, count_cubes(instructions));
     // let instructions = parse_data(include_str!("../inputs/day22puzzle.txt"));
     // assert_eq!(543306, count_cubes(instructions));

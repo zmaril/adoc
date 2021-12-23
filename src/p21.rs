@@ -1,7 +1,5 @@
-use std::cmp::Ordering;
-use std::collections::BinaryHeap;
-use std::collections::HashMap;
 use cached::proc_macro::cached;
+use std::cmp::Ordering;
 
 #[derive(Hash, Clone, Debug, PartialEq, Eq, Copy)]
 pub struct Game {
@@ -29,8 +27,8 @@ impl PartialOrd for Game {
     }
 }
 
-pub fn advance(mut g: Game, p: u8, n: u64) -> Game {
-    if p == 1 {
+pub fn advance(mut g: Game, is_player_ones_turn: bool, n: u64) -> Game {
+    if is_player_ones_turn {
         g.p1_place += n;
         g.p1_place = (g.p1_place - 1) % 10 + 1;
         g.p1_score += g.p1_place;
@@ -60,7 +58,7 @@ pub fn part1(a: u64, b: u64) -> u64 {
             dice = (dice - 1) % 100 + 1;
         }
         rolls += 3;
-        g = advance(g, 1, n);
+        g = advance(g, true, n);
         if g.p1_score >= 1000 {
             break;
         }
@@ -72,7 +70,7 @@ pub fn part1(a: u64, b: u64) -> u64 {
             dice = (dice - 1) % 100 + 1;
         }
         rolls += 3;
-        g = advance(g, 2, n);
+        g = advance(g, false, n);
         if g.p2_score >= 1000 {
             break;
         }
@@ -84,86 +82,60 @@ pub fn part1(a: u64, b: u64) -> u64 {
 }
 
 #[cached]
-pub fn find_num_wins(g: Game) -> (u64, u64) {
-    let mut s1 = 0;
-    let mut s2 = 0;
-    for n in 3..=9 {
-        let next = advance(g, 1, n);
-        if g.p1_score >= 21 {
-            s1 += 1;
-            return (s1, s2);
+pub fn count_num_wins(g: Game, is_player_ones_turn: bool) -> (u64, u64) {
+    if g.p1_score >= 21 {
+        println!(
+            "({:2} {:2}) ({:2} {:2}) {} {}",
+            g.p1_score, g.p1_place, g.p2_score, g.p2_place, 1, 0
+        );
+        return (1, 0);
+    }
+    if g.p2_score >= 21 {
+        println!(
+            "({:2} {:2}) ({:2} {:2}) {} {}",
+            g.p1_score, g.p1_place, g.p2_score, g.p2_place, 0, 1
+        );
+        return (0, 1);
+    }
+    let mut p1_wins = 0;
+    let mut p2_wins = 0;
+    for i in 1..=3 {
+        for j in 1..=3 {
+            for k in 1..=3 {
+                let next = advance(g, is_player_ones_turn, i + j + k);
+                let (n1, n2) = count_num_wins(next, !is_player_ones_turn);
+                p1_wins += n1;
+                p2_wins += n2;
+            }
         }
     }
-    (s1, s2)
-}
-const OUTCOMES: [(u64,u64); 7] = [(3, 1), (4, 3), (5, 6), (6, 7), (7, 6), (8, 3), (9, 1)];
 
-pub fn part2(a: u64, b: u64) -> u64 {
-    let mut g = Game {
+    println!(
+        "({:2} {:2}) ({:2} {:2}) {} {}",
+        g.p1_score, g.p1_place, g.p2_score, g.p2_place, p1_wins, p2_wins
+    );
+    return (p1_wins, p2_wins);
+}
+
+pub fn part2(a: u64, b: u64) -> (u64, u64) {
+    let g = Game {
         p1_place: a,
         p1_score: 0,
         p2_place: b,
         p2_score: 0,
     };
-
-    let mut counts: HashMap<Game, u64> = HashMap::new();
-    // once it is done, remove it?
-    counts.insert(g, 1);
-
-    /// filter out binary heap???
-    let mut todo = BinaryHeap::new();
-    todo.push(g);
-    let mut total = 0;
-
-    while let Some(game) = todo.pop() {
-        if g.p1_score >= 21 {
-            total += counts.get(&game).unwrap();
-            continue;
-        }
-        if g.p2_score >= 21 {
-            continue;
-        }
-        let count = counts.get(&game).unwrap().clone();
-
-        dbg!(game);
-        for (roll, ways) in &OUTCOMES {
-            let next = advance(game, 1, *roll);
-            dbg!(count, ways);
-            counts
-                .entry(next)
-                .and_modify(|e| *e += count * ways)
-                .or_insert(count * ways);
-            todo.push(next);
-        }
-
-        for (roll, ways) in &OUTCOMES {
-            let next = advance(game, 2, *roll);
-            dbg!(count, ways);
-            counts
-                .entry(next)
-                .and_modify(|e| *e += count * ways)
-                .or_insert(count * ways);
-            todo.push(next);
-        }
-    }
-    total
-}
-
-#[cached]
-pub fn count_num_wins(g: Game) -> (i32,i32) {
-}
-
-pub fn part2a() {
-
+    return count_num_wins(g, true);
 }
 
 pub fn main() {
-    assert_eq!(part1(4, 8), 739785);
-    assert_eq!(part1(5, 10), 711480);
-    let big: u64 = 444356092776315;
-    assert_eq!(part2(4,8),big);
-    let bigger: i64 = 0;
-    assert_eq!(part2(5,10),0);
+    //assert_eq!(part1(4, 8), 739785);
+    //assert_eq!(part1(5, 10), 711480);
+    let a: u64 = 444356092776315;
+    let b: u64 = 341960390180808;
+    assert_eq!(part2(4, 8), (a, b));
+    let a: u64 = 0;
+    let b: u64 = 0;
+    assert_eq!(part2(5, 10), (a, b));
 }
 
 // number of times seen
