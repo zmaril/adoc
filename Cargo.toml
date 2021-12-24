@@ -11,6 +11,7 @@ nom = "7.1.0"
 rustc-hash = "1.1.0"
 rayon = "1.5.1"
 cached = "0.26.2"
+maplit = "1.0.2"
 
 [profile.release]
 debug = true
