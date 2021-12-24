@@ -10,9 +10,11 @@ extern crate cached;
 pub mod p22;
 pub mod p22cc;
 pub mod p23;
+pub mod p24;
 
 fn main() {
     //p22::main();
-   p22cc::main();
+   //p22cc::main();
    //p23::main()
+   p24::main();
 }
