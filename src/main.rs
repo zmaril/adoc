@@ -6,10 +6,12 @@ extern crate rustc_hash; // not needed in Rust 2018
 extern crate rayon;
 extern crate cached;
 #[macro_use] extern crate maplit;
+extern crate itertools;
+extern crate num_format;
 
-pub mod p22;
-pub mod p22cc;
-pub mod p23;
+//pub mod p22;
+//pub mod p22cc;
+//pub mod p23;
 pub mod p24;
 
 fn main() {
